@@ -1,12 +1,15 @@
 pub struct Cpu {
     registers: [u8; Cpu::N_REGS],
     memory: [u8; Cpu::MEM_SIZE],
+    stack: [u16; Cpu::STACK_SIZE],
     pc: usize,
+    sp: usize,
 }
 
 impl Cpu {
     const N_REGS: usize = 16;
     const MEM_SIZE: usize = 0x1000;
+    const STACK_SIZE: usize = 16;
 
     fn fetch_instr(&mut self) -> u16 {
         let lower = self.memory[self.pc] as u16;
@@ -24,12 +27,9 @@ impl Cpu {
         self.registers[reg] = val;
     }
 
-    pub fn load_byte(&self, addr: usize) -> u8 {
-        self.memory[addr]
-    }
-
-    pub fn store_byte(&mut self, addr: usize, val: u8) {
-        self.memory[addr] = val;
+    pub fn store_bytes(&mut self, start: usize, body: &[u8]) {
+        let end = start + body.len();
+        self.memory[start..end].copy_from_slice(body);
     }
 
     fn decode(&self, opcode: u16) -> (u8, u8, u8, u8) {
@@ -48,6 +48,8 @@ impl Cpu {
             match self.decode(opcode) {
                 (0, 0, 0, 0) => return,
                 (0x8, x, y, 0x4) => self.add(x, y),
+                (0x2, _, _, _) => self.call(opcode & 0x0FFF),
+                (0, 0, 0xE, 0xE) => self.ret(),
                 _ => todo!(),
             }
         }
@@ -61,6 +63,42 @@ impl Cpu {
         self.store_reg(r1 as usize, result);
         self.store_reg(Cpu::N_REGS - 1, if overflow { 1 } else { 0 });
     }
+
+    fn call(&mut self, addr: u16) {
+        // save return addr
+        // inc sp
+        self.push_to_stack();
+
+        // jump to addr
+        self.pc = addr as usize;
+    }
+
+    fn ret(&mut self) {
+        // dec sp
+        // pop return addr
+        let return_addr = self.pop_from_stack();
+
+        // jump back
+        self.pc = return_addr as usize;
+    }
+
+    fn push_to_stack(&mut self) {
+        if self.sp >= self.stack.len() {
+            panic!("stack overflow");
+        }
+
+        self.stack[self.sp] = self.pc as u16;
+        self.sp += 1;
+    }
+
+    fn pop_from_stack(&mut self) -> u16 {
+        if self.sp == 0 {
+            panic!("stack underflow");
+        }
+
+        self.sp -= 1;
+        self.stack[self.sp]
+    }
 }
 
 impl Default for Cpu {
@@ -68,7 +106,9 @@ impl Default for Cpu {
         Cpu {
             registers: [0; Cpu::N_REGS],
             memory: [0; Cpu::MEM_SIZE],
+            stack: [0; Cpu::STACK_SIZE],
             pc: 0,
+            sp: 0,
         }
     }
 }

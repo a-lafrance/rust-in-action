@@ -1,0 +1,20 @@
+[package]
+name = "actionkv"
+version = "0.1.0"
+edition = "2021"
+
+authors = ["Arthur Lafrance"]
+description = "A simple key-value store"
+
+[dependencies]
+byteorder = "1.4.3"
+clap = { version = "3.1.18", features = ["derive"] }
+crc = "3.0.0"
+
+[lib]
+name = "libactionkv"
+path = "src/lib.rs"
+
+[[bin]]
+name = "akv-mem"
+path = "src/akv_mem.rs"
